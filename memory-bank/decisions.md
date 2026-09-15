@@ -1,5 +1,30 @@
 # Decisions (ADRs) — Agency Agents
 
+## 2026-09-12 — Strip AppImage bundle paths from every child process, rather than patching git
+
+**Context.** The v0.3.0 AppImage could not clone the catalog on any host that was not the build host. linuxdeploy's
+`AppRun.wrapped` exports `LD_LIBRARY_PATH` with the bundle's directories first and the caller's original appended,
+and saves no copy of the original anywhere. Children inherit it, so a host binary loads bundle libraries it was not
+built against. Confirmed by unsquashing the shipped AppImage and reading `AppRun`, `apprun-hooks/…-gtk.sh` and the
+strings in `AppRun.wrapped`.
+
+**Decision.** One helper, `util::proc`, applied at **every** spawn site rather than a targeted fix in `run_git`.
+It removes only path entries under `$APPDIR`, leaving the host's own search path intact, and is a no-op when
+`$APPDIR` is unset.
+
+**Why not the alternatives.**
+- *Fix `run_git` only* — rejected: `probe_version` and `reveal_path` spawn host binaries through the same
+  environment. Tool detection on Linux was plausibly degraded by this too. A bug report names a symptom; grep for
+  the siblings (`grep -rn "Command::new"`).
+- *Restore the original `LD_LIBRARY_PATH`* — impossible: AppRun keeps no copy. Removal is the only correct option.
+- *Clear the whole environment* — rejected: too blunt, would break legitimate inherited config.
+- *Strip `XDG_DATA_DIRS`/`GTK_*` wholesale* — rejected: AppRun *prepends* to those, so the host halves are real and
+  must survive. We filter per entry.
+
+**Consequence.** Bundle-vs-host library conflicts are closed off for all current and future child processes. The
+rule generalizes: **anything an AppImage spawns must have the bundle stripped from its environment first.**
+
+
 ### 2026-06-05: Fork brew-browser structurally
 **Status**: Approved. **Context**: brew-browser is a proven, signed, shipping Tauri 2 +
 Svelte 5 native macOS app that is "a thin respectful frontend over a CLI." Agency Agents
@@ -211,3 +236,44 @@ on exposed three latent traps that the manual-DMG (`SKIP_UPDATER`) path had alwa
    the Keychain copy must match it byte-for-byte. `release.sh` is fully Keychain-based — no `signing.env`.
 **Consequences**: `release.sh` now signs updater artifacts cleanly with no manual `signer sign -f` step; the next
 release "just works." **References**: `tasks/2026-06/260623_v0.2.0-ship.md`, `~/Downloads/fix-updater-keychain.sh`.
+
+---
+
+## 2026-09-14 — Verify a PR set together before merging any of it, and gate Windows separately
+
+**Status**: Approved. **Context**: seven PRs were merged for v0.3.1. All seven were first merged into a throwaway
+worktree off `main` and verified as one tree (279 Rust tests, `svelte-check` 322 files / 0 errors) before any of them
+touched `main`. That caught nothing — but #77, verified only on macOS, broke the Windows build immediately after
+merge, because `spawnSync("tauri")` resolves to a real executable on macOS/Linux and to `tauri.cmd` on Windows.
+
+**Decision**:
+1. **A combined-tree check is the minimum bar** when landing more than two PRs at once; PR-by-PR checks do not prove
+   the set.
+2. **A combined tree is not enough on its own** — it only exercises the host platform. Any PR touching build
+   invocation, process spawning or path handling must be checked on Windows, either by `pr-check.yml` or by
+   dispatching a build against the branch before merge.
+3. **Never route a command through a shim or a shell when the real entry point can be called directly.** Every
+   Windows failure this session was an intermediary altering or hiding the command: `tauri.cmd` (Node refuses to exec
+   `.cmd`), the npm shim through PowerShell (`Unknown command: "pm"`), `-ArgumentList` stripping quotes out of inline
+   JSON, and `stdio: "inherit"` swallowing the output that would have explained any of it. The fix each time was
+   `node <entry>.js` — and for config, a file path rather than inline JSON.
+
+**Consequences**: #105 resolves `@tauri-apps/cli/tauri.js` and runs it with `process.execPath`. `pr-check.yml` moves
+from "nice to have" to required. **References**: PRs #77, #105; issue #87.
+
+---
+
+## 2026-09-14 — Windows packaging stays on CI; the ARM64 VM is a build-and-test box, not a packaging box
+
+**Status**: Approved. **Context**: the Parallels Windows 11 ARM64 VM was provisioned to build releases locally
+(VS Build Tools, SDK 10.0.26100, Rust 1.98.1 both MSVC targets, Node 22.20). It compiles both architectures natively
+in about three minutes each, but neither bundler runs: WiX's `candle.exe` and NSIS's `makensis.exe` are both 32-bit
+x86. `makensis` exits `0xC0000135` with every plausible cause ruled out — x86 emulation verified working,
+`zlib1.dll` x86 alongside, `MSVCP60.dll` present in System32 and SysWOW64, x86 VC++ redistributable installed.
+
+**Decision**: CI packages Windows. The VM compiles, installs CI artifacts and tests them. `bundle.targets: "all"` is
+accepted as **x64-only on Windows**; any ARM64 Windows build must pass `--bundles nsis`.
+
+**Consequences**: two gaps to document — the build requires **clang**, which the VC workload omits and CI only
+satisfies because the runner image ships LLVM; and a from-scratch Windows build host cannot produce installers.
+**References**: `activeContext.md` § Windows build box.

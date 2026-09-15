@@ -1,9 +1,120 @@
+# Next session
+
+**Start here (2026-09-15).** v0.3.1 is cut and validated. `main` @ `32641d5`. PR **#104** is the release candidate —
+Linux and Windows CI green on its exact head — and merging it is step one.
+
+1. **Merge #104**, then **#103** (this PR; supersedes #86 — close #86), then **#82** (missing Healthcare string) and
+   **#81** (RTL: `main` has no direction handling at all; the Farsi UI only looked right because browsers apply bidi
+   to Arabic script).
+2. **Build the Mac DMGs here** — `scripts/release.sh`. Developer ID and the notarisation password come from the
+   Keychain (`agency-agents-notary`), so this step cannot run on CI. Both architectures.
+3. **Tag `v0.3.1`, cut the release**: two DMGs from this machine, deb/rpm/AppImage and two `-setup.exe` from CI.
+4. **Bump the Homebrew cask** — `version` plus both `sha256`, computable only once the DMGs exist. The tap is
+   `msitarzewski/homebrew-agency-agents`; the `verified:` deprecation is already fixed at `551d6eb`.
+5. **Then #100** (`cargo fmt`, 18 files) — last, so it conflicts with nothing. Turn on `cargo fmt --check` in
+   `pr-check.yml` in the same commit, not before.
+
+**Two known bugs, neither fixed.** The `PYTHONHOME`/`PYTHONPATH` leak into AppImage children (breaks `aider`
+detection for every AppImage user; two entries in `util/proc.rs`), and the Tauri CLI rewriting `Cargo.toml` on every
+macOS build. Both are described in `activeContext.md`.
+
+**Do not close #65** until someone launches a fresh install on a clean Windows box. The VM has WebView2
+`153.0.4234.32` already installed, so the failure mode cannot reproduce there without removing the runtime first.
+
+
+---
+
 # NEXT SESSION — resume notes (Agency Agents)
 
 Read this first after a compaction. Then `activeContext.md`, `agentLog.md` (append-only history),
 `phases/phase-roadmap.md`, `contracts.md`, `systemPatterns.md`, `decisions.md`.
 
-## ⏩ CURRENT (2026-06-23) — read `activeContext.md` for the live picture
+## ⏩ CURRENT (2026-09-12) — start here
+
+**The app's problem is not code, it is that nothing ships.** Last release **v0.3.0, 2026-07-05**. `main` sat
+unchanged 07-30 → 09-12. **16 open PRs, 16 open issues, every PR mergeable with zero conflicts.** Six PRs are ours.
+Several open issues may already be fixed on `main` and nobody can tell. **Do a v0.3.1 before writing more code.**
+
+### The cheapest path to a much better app
+1. Merge the small, already-written platform fixes: **#69** (Windows WebView2 bootstrapper, +3 lines — the likely
+   fix for #65 "window never opens"), **#85** (@ROTl24, console-window flash → #84), **#99** (@Musa919, Linux
+   AppArmor in the release container).
+2. Then the low-risk contributor work: #97 docs, #98 dep bumps, #101 Turkish i18n, #80 winget docs, #77 build fix.
+3. **Tag v0.3.1.** Release-build gotchas are unchanged and still live in `BUILD.md` / `release.sh` — updater-on
+   macOS builds must pass `--config`, Intel cross-compile needs the rustup toolchain, store the Keychain key via
+   `$(cat …)`, asset names use underscores.
+4. **#100 (`cargo fmt` the whole backend) should land on its own, ideally last** — it touches ~everything and will
+   conflict with anything in flight. `cargo fmt` is *not* clean on `main` today, so until #100 lands, format only
+   files you add.
+
+### Landed 2026-09-12 (PR #102) — and the durable lesson
+Closed **#94** (AppImage could not clone the catalog on any non-build host) and **#92** (`[object Object]`).
+The lesson worth keeping: **anything an AppImage spawns must have the bundle stripped from its environment first.**
+`AppRun` puts the bundle's `LD_LIBRARY_PATH` first and keeps no copy of the original, so a *host* binary loads
+*bundle* libraries. `run_git` was only the visible victim — `probe_version` (tool detection) and `reveal_path` were
+equally poisoned. When a report names one symptom, `grep -rn "Command::new"` for the siblings before calling it fixed.
+
+### Test bed for Linux work (new)
+`ssh scratch` — Ubuntu 26.04.1 aarch64, passwordless root, git/curl/node/cargo present. Left in place:
+`/tmp/ld-repro/lib/libnghttp2.so.14` (a genuine Ubuntu 22.04 arm64 build; put it on `LD_LIBRARY_PATH` to reproduce
+#94 on any host) and `/tmp/appimg/` (the v0.3.0 AppImage unsquashed — offset is `e_shoff + e_shentsize×e_shnum`
+from the ELF header). **Releases ship an amd64-only AppImage**, so the shipped Linux artifact cannot be *run* on
+that ARM box; reproduce mechanisms or build arm64 locally.
+
+### Gates
+`npm run check` = **0 errors on clean `main`** — take the baseline before blaming your diff. `cargo test` for the
+backend. No `lint`, no `test` npm script. A fresh worktree needs `npm ci`.
+
+---
+
+## ⏩ CURRENT (2026-08-10) — post-v0.3.0 steady state; RTL Phase 1 in flight
+`main` @ `04c10be` (Persian #73 merged). **v0.3.0 shipped ~07-05** (Runbooks headline). Since then: a long
+steady-state of contributor merges + polish + i18n; **no new release cut yet**.
+
+**Merged this arc (all branch→PR):** #56 i18n copy · #58 Linux AppImage EGL crash (un-bundle stale libwayland)
+· #59 Russian Runbooks · **#68 agent-updates modal** ("N updates available" agents×tools dot-grid) · **#64 ZCode
+tool** (Z.ai GLM; `zcode-md` == `qwen-md`) + **#70 ZCode brand icon** (lobehub zhipu mark) · #63 project-only
+install guidance (**closed #40**) · **#74 Antigravity uninstall fix** (`remove_dir` the orphaned skill-md
+`<slug>/` dir — **closed #60**) · **#73 Persian (fa-IR)** (montajebii; **closed #72**).
+
+**OPEN PRs (8, all MERGEABLE):** **#81 RTL Phase 1** (mine) · **#82 Healthcare division label** (mine) · #85
+Windows console flash · #80 winget README · #77 `npm run tauri` TAURI_CONFIG fix (kills the macos-private-api
+footgun properly) · #69 WebView2 embedBootstrapper · #67 clone-on-first-run (removes bundled baseline — big
+surface) · #62 Runbooks doc-render/staged. → **#67/#69 want Linux+Windows CI dispatched before merge** (app CI =
+tags/dispatch only).
+
+**RTL = this session's focus. Phase 1 = PR #81, verified live in Persian on macOS.** The switch is ONE line —
+`document.documentElement.dir = isRTL(locale) ? "rtl" : "ltr"` in `applyLocale` (i18n.svelte.ts) — and the
+flexbox-heavy UI mirrors ~everything for free. The two spots that CAN'T: the **titlebar** (absolutely positioned
+by physical `left:` offsets → swapped to `right:` in RTL in `+page.svelte`, with a macOS **traffic-light
+clearance** since the OS lights never mirror) and **Settings.svelte**'s bespoke close-X (`right:` →
+`inset-inline-end`). `RTL_LOCALES = ["fa"]` in messages.ts. **Phase 2 (NOT started, ~½ day, captured in #81
+body):** logical-property sweep of ~13 overlay positions (Toast/CommandPalette/InstallModal/DiffModal/…),
+`text-align: left`→`start` (~38), the division-row internals, and chevron/arrow directional-icon mirroring.
+**KEY DESIGN FACT:** agent names/descriptions are **catalog content (English, authored upstream) — NOT translated
+by design** (`en.ts:49` documents it: chrome is localized, "persona content stays as authored upstream"). Only
+app chrome + division `category.*` labels are i18n. So English agent names in a Persian UI = correct, not a bug.
+#82 fixed a stale-catalog i18n gap (app kept dead `category.strategy`, lacked `category.healthcare`).
+
+**OPEN ISSUES:** #79 "58 but only 57 identified" (screenshot-only, untriaged) · #76 catalog-aware "Find the right
+agent" recommender (my tracking issue crediting @Rawlus7's catalog #634 draft; referral posted, quiet) · #71
+OpenClaw + #66 Antigravity Windows detection ("installed-but-not-detected" pair, likely shared root cause; not
+started) · #65 Windows launch (waits on reporter) · #27 skills · #26 Hermes. #75 closed as spam.
+
+**DEV GOTCHAS (hard-won this session):** (1) `tauri dev` on macOS re-injects `macos-private-api` into base
+`Cargo.toml` — run with `--config '{"app":{"macOSPrivateApi":true}}'`, `git checkout Cargo.toml` after (PR #77
+fixes it). (2) **Vite does NOT watch `src-tauri/data/tools.json`** (outside `src/`) — after a change touching it,
+`⌘R` won't help; **restart the dev server**. Dev-only (prod bundles fresh). (3) A new catalog integration NEVER
+auto-appears — Tools list is compiled in (`registry.rs include_str!` + `IMPLEMENTED_FORMATS`), so it needs a
+**paired app PR** (def + renderer + format gate + icon). (4) Forcing locale via `init()` doesn't take on first
+paint (SSR→English, hydration doesn't re-flip) — use the picker or a saved localStorage locale.
+
+**Icon WIP:** a re-authored Liquid Glass `.icon` (neon brain render) was **reverted to `git stash`** — the render
+baked in its own frame/gloss/shadow, wrong shape for the OS-applied Liquid Glass pipeline. Recoverable if wanted.
+
+---
+
+## ⏩ (history) CURRENT (2026-06-23) — read `activeContext.md` for the live picture
 **v0.2.0 SHIPPED** (`main` @ `16182e5`, PRs #21 + #22) — first feature release since v0.1.0, rolling up the
 v0.1.1 IA re-org (divisions landing, Teams, Projects pillar, the single InstallModal grid + DeployBrowser) and
 v0.1.2 tool-registry/Osaurus/Playbook arc, **plus LIVE auto-update**. 9 release assets across macOS (aarch64+x64,
