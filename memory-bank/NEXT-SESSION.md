@@ -1,3 +1,29 @@
+# Next session
+
+**Start here (2026-09-15).** v0.3.1 is cut and validated. `main` @ `32641d5`. PR **#104** is the release candidate —
+Linux and Windows CI green on its exact head — and merging it is step one.
+
+1. **Merge #104**, then **#103** (this PR; supersedes #86 — close #86), then **#82** (missing Healthcare string) and
+   **#81** (RTL: `main` has no direction handling at all; the Farsi UI only looked right because browsers apply bidi
+   to Arabic script).
+2. **Build the Mac DMGs here** — `scripts/release.sh`. Developer ID and the notarisation password come from the
+   Keychain (`agency-agents-notary`), so this step cannot run on CI. Both architectures.
+3. **Tag `v0.3.1`, cut the release**: two DMGs from this machine, deb/rpm/AppImage and two `-setup.exe` from CI.
+4. **Bump the Homebrew cask** — `version` plus both `sha256`, computable only once the DMGs exist. The tap is
+   `msitarzewski/homebrew-agency-agents`; the `verified:` deprecation is already fixed at `551d6eb`.
+5. **Then #100** (`cargo fmt`, 18 files) — last, so it conflicts with nothing. Turn on `cargo fmt --check` in
+   `pr-check.yml` in the same commit, not before.
+
+**Two known bugs, neither fixed.** The `PYTHONHOME`/`PYTHONPATH` leak into AppImage children (breaks `aider`
+detection for every AppImage user; two entries in `util/proc.rs`), and the Tauri CLI rewriting `Cargo.toml` on every
+macOS build. Both are described in `activeContext.md`.
+
+**Do not close #65** until someone launches a fresh install on a clean Windows box. The VM has WebView2
+`153.0.4234.32` already installed, so the failure mode cannot reproduce there without removing the runtime first.
+
+
+---
+
 # NEXT SESSION — resume notes (Agency Agents)
 
 Read this first after a compaction. Then `activeContext.md`, `agentLog.md` (append-only history),

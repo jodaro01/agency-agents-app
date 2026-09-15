@@ -1,11 +1,70 @@
 # Active Context — Agency Agents
 
-**State (2026-09-12)**: **post-v0.3.0 steady state, and the bottleneck is the release, not the code.** `main` @
-`e8f3fcd`. v0.3.0 shipped **2026-07-05**; `main` then sat still from 07-30 until today, 24+ commits past the tag,
-while the queue grew to **16 open PRs and 16 open issues — every PR mergeable, zero conflicts.** Six of those PRs
-are ours (#62 runbooks render, #67 clone-on-first-run, #69 Windows WebView2 embed, #81 RTL Phase 1, #82 healthcare
-label, #86 this memory-bank catch-up). Several open issues may already be fixed on `main` and nobody can tell,
-because nothing has shipped in two months. **The highest-value next action is cutting v0.3.1**, not writing more code.
+**State (2026-09-15)**: **v0.3.1 is cut and validated; only the Mac DMGs remain.** `main` @ `32641d5`, eight commits
+past `e8f3fcd`. The release candidate is PR #104 (`feat/approved-icon-family`) — Linux and Windows CI both green on
+its exact head — carrying the icon family, the landing favicon fix and the version bump. The queue is down from 16
+open PRs to 10 and from 16 issues to 11. What is left is `scripts/release.sh` on this machine (Developer ID +
+notarisation come from the Keychain, so Mac builds cannot come from CI), then the tag, the release, and the cask's
+`version`/`sha256`, which can only be computed once the DMGs exist.
+
+**Landed 2026-09-14 — the release push.** Seven PRs verified *together* in a throwaway worktree before any of them
+touched `main` (279 Rust tests, `svelte-check` 322 files / 0 errors), then merged in order: #95 `brew trust` in the
+README, #69 embed the WebView2 bootstrapper, #77 correct `TAURI_CONFIG` for the CLI, #85 no Windows console flashes,
+#99 AppArmor unconfined for the Linux release container, #98 in-range dependency bumps, #101 Turkish localisation.
+Issues #96, #87 and #84 closed; **#65 deliberately left open** — #69 is a strong candidate but nobody has reproduced
+it on a clean Windows box, and closing on reasoning alone would be claiming a fix we have not demonstrated.
+
+**#77 broke the Windows build, and nothing caught it.** `tools/tauri-run.mjs` spawns `tauri` from PATH; on Windows
+the npm shim is `tauri.cmd`, which Node refuses to exec without `shell: true` — and `shell: true` would then mangle
+the JSON `--config` through cmd.exe quoting. Fixed in #105 by resolving `@tauri-apps/cli/tauri.js` and running it
+with `process.execPath`: no shim, no shell, no quoting layer. It was merged having been verified only on macOS, and
+surfaced only because a Windows build was dispatched against the RC branch. **This repo still has no PR CI** — the
+`pr-check.yml` draft (svelte-check + `cargo test`, deliberately without `cargo fmt --check` until #100 lands) would
+have caught it, and has now earned its place.
+
+**#94 is proven at runtime, not inferred.** An x86_64 Ubuntu 24.04 guest (QEMU under the ARM Scratch VM) ran the
+jammy-built AppImage — a genuinely foreign host. The app's own environment carries eleven bundle dirs in
+`LD_LIBRARY_PATH`; the `git` child it spawned has `LD_LIBRARY_PATH`, `GSETTINGS_SCHEMA_DIR` and
+`GDK_PIXBUF_MODULE_FILE` gone, `XDG_DATA_DIRS` reduced to the host's `/usr/share`, and `APPDIR` deliberately intact.
+No `nghttp2` error. **A harness lesson came with it**: the first capture read empty and proved nothing —
+`tr '\0' … < /proc/self/environ` opens the proc file before `execve`, so the read returns nothing after exec.
+`cat /proc/self/environ | tr` works. Always prove a fixture can show the failure before trusting its silence.
+
+**Two live bugs found and not yet fixed.**
+- **`PYTHONHOME`/`PYTHONPATH` leak into AppImage children** — the same class as #94 at different variables, and the
+  sanitiser does not cover them. The bundle contains no Python (`usr/bin` holds exactly `agency-agents-app` and
+  `xdg-open`), so a Python child dies with `ModuleNotFoundError: No module named 'encodings'`. **`aider` is a
+  pip-installed CLI and one of the fifteen binaries `probe_version` spawns**, so every AppImage install reports it as
+  absent when it is present. Demonstrated with a `#!/usr/bin/env python3` stand-in: rc=0 on the host, rc=1 under the
+  environment the AppImage hands its children. Two entries fix it — `PYTHONPATH` into `PATH_LIST_VARS`, `PYTHONHOME`
+  into `BUNDLE_ONLY_VARS`. Note `PERLLIB` is already covered; Python was simply missed.
+- **The Tauri CLI rewrites `Cargo.toml` on every macOS build**, adding `macos-private-api` to the *base*
+  `[dependencies]`. `main` keeps it correctly scoped under `[target.'cfg(target_os = "macos")'.dependencies]`.
+  Committing the generated form ships a macOS-only feature to Linux and Windows, whose resolved config never carries
+  `macOSPrivateApi`, reproducing the allowlist failure as red CI. It bit three times in one day. A pre-commit guard
+  rejecting the base-dependency form would make it unshippable by accident.
+
+**Windows build box (Parallels ARM64), provisioned 2026-09-14.** From nothing but git and the SDK: VS Build Tools at
+`C:\BuildTools` (Hostarm64 → arm64/x64/x86), SDK 10.0.26100, Rust 1.98.1 with both MSVC targets, Node 22.20. It
+**compiles** both architectures natively in ~3 min each (v0.3.1, PE `0xAA64` and `0x8664`) but **cannot package**:
+NSIS's `makensis.exe` is 32-bit and exits `0xC0000135` (DLL not found) with every candidate ruled out — x86 emulation
+works, `zlib1.dll` is x86, `MSVCP60.dll` is present, the x86 VC++ redistributable changed nothing. WiX fails the same
+way, so `bundle.targets: "all"` is effectively **x64-only on Windows**. Packaging stays with CI. Two facts worth the
+docs: the build needs **clang** (the VC workload omits it; CI only works because the runner image ships LLVM), and
+`--bundles nsis` is required on any ARM64 Windows host.
+
+**The icon family (PR #104).** The mark filled 71.3% of the canvas and was off-centre — measured from the masters its
+bbox is `(179,162)-(875,892)`, centre `(527,527)` not `(512,512)`. One wrapper per layer,
+`translate(512,512) scale(1.12) translate(-527,-527)`, no path edits: now 79.9%, `L=R=61`, `T=52 B=51`. A **dark
+rendition** now exports too — `icon.json` always declared one, but the build only ever ran `--rendition Default`, so
+the About modal showed a white plate in a dark window. Both assets downscale to 256 (they render at 80px):
+**1,324,994 bytes → 102,073 for two**. `Sources/Front.svg`, `Sources/Middle.svg` and `build-icons.sh` were
+**untracked** — the editable artwork existed in one working tree with no way to recover it — and are now in the repo.
+Separately, five landing favicons were committed as **fully transparent PNGs**, including both PWA manifest icons.
+
+**Homebrew.** #857 (`verified:` deprecation) fixed and pushed to the tap as `551d6eb`; reproduced before and
+confirmed silent after, `brew audit --cask --strict` exits 0. #96 was the more serious one — Homebrew 7 refuses
+untrusted third-party casks outright, so the documented install path failed at the first command until #95.
 
 **Landed today (PR #102)** — two Linux bugs that compounded each other, both reported by @mrKlar:
 - **#94 — AppImage child processes inherited the bundle library path.** linuxdeploy's `AppRun.wrapped` exports
