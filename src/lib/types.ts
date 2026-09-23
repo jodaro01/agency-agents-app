@@ -590,6 +590,42 @@ export type SidebarSection =
 
 export type ThemePreference = "light" | "dark" | "system";
 
+// =========================================================
+// Paperclip native connection
+// =========================================================
+
+export interface PaperclipStatus {
+  configured: boolean;
+  apiBaseUrl: string | null;
+  companyId: string | null;
+}
+
+export interface PaperclipLoginStart {
+  approvalUrl: string;
+  expiresAt: string;
+  pollIntervalMs: number;
+}
+
+export interface PaperclipAuthPoll {
+  status: "pending" | "approved" | "cancelled" | "expired";
+}
+
+export interface PaperclipAgentSummary {
+  id: string;
+  name: string;
+  title: string | null;
+  role: string | null;
+  adapterType: string | null;
+  status: string | null;
+}
+
+export interface PaperclipProjectSummary {
+  id: string;
+  name: string;
+  status: string | null;
+  urlKey: string | null;
+}
+
 /** Settings modal subsection. Kept in sync with Settings.svelte's
     internal section list — use this when deep-linking via
     `ui.openSettings(section)`. */
