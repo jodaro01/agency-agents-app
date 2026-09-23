@@ -15,6 +15,15 @@ use crate::commands::settings::{self, SettingsLoadState};
 use crate::commands::updater::UpdaterState;
 use crate::error::AppError;
 
+/// Ephemeral Paperclip device-flow data. Secret fields stay in native memory and never cross IPC.
+pub(crate) struct PendingPaperclipAuth {
+    pub(crate) api_base_url: String,
+    pub(crate) company_id: String,
+    pub(crate) challenge_id: String,
+    pub(crate) challenge_token: String,
+    pub(crate) board_api_token: String,
+}
+
 /// Shared application state. Registered via `Builder::manage()`.
 pub struct AppState {
     /// Resolved app-data root — the OS-canonical
@@ -49,6 +58,9 @@ pub struct AppState {
     /// staleness. See `crate::commands::updater::UpdaterState` for the
     /// shape and the rationale.
     pub updater_state: Arc<RwLock<UpdaterState>>,
+
+    /// One short-lived Paperclip browser-auth flow; the board token remains native-only.
+    pub(crate) paperclip_pending_auth: Arc<Mutex<Option<PendingPaperclipAuth>>>,
 }
 
 impl AppState {
@@ -84,6 +96,7 @@ impl AppState {
             corpus_refresh_in_flight: Arc::new(Mutex::new(())),
             settings: Arc::new(RwLock::new(settings_state)),
             updater_state: crate::commands::updater::empty_state(),
+            paperclip_pending_auth: Arc::new(Mutex::new(None)),
         })
     }
 
