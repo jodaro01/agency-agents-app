@@ -37,3 +37,12 @@ live picture.
 `main` has gone unshipped since **v0.3.0 (2026-07-05)** while 16 mergeable PRs and 16 issues accumulated. Fixes that
 do not ship do not count. The cheapest large win available is a **v0.3.1**: merge the small, already-written
 platform fixes (#69 Windows WebView2 +3 lines, #85 console flash, #99 Linux AppArmor), then tag.
+
+
+## Native Paperclip bridge prototype (2026-09-23)
+
+- Isolated fork branch: `codex/paperclip-native-sync-2026-09-23`; pre-change snapshot: `backup/pre-paperclip-2026-09-23`.
+- Native Tauri REST bridge uses Paperclip's browser-approved CLI challenge, requests board access for one selected company, keeps the pending bearer token in native memory, and stores the approved token in the OS Keychain.
+- First slice reads a safe agent roster and active projects through typed DTOs; it deliberately does not edit agent instructions, adapter configuration, projects, or workspaces.
+- Paperclip MCP health check returned 0.3.1 / authenticated / public; the three delegated Paperclip issues have no execution run.
+- Local build and app verification remain pending because the local terminal tunnel is unavailable. Do not call this a completed mirror until the app is built and the Droplet connection is verified.
