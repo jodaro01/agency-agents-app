@@ -46,3 +46,14 @@ platform fixes (#69 Windows WebView2 +3 lines, #85 console flash, #99 Linux AppA
 - First slice reads a safe agent roster and active projects through typed DTOs; it deliberately does not edit agent instructions, adapter configuration, projects, or workspaces.
 - Paperclip MCP health check returned 0.3.1 / authenticated / public; the three delegated Paperclip issues have no execution run.
 - Local build and app verification remain pending because the local terminal tunnel is unavailable. Do not call this a completed mirror until the app is built and the Droplet connection is verified.
+
+
+## Paperclip adapter/plugin compatibility check (2026-09-23)
+
+- Live health reports Paperclip `0.3.1`, deployment mode `authenticated`, exposure `public`.
+- The official `v0.3.1` adapter registry contains nine built-ins: `claude_local`, `codex_local`, `cursor`, `gemini_local`, `opencode_local`, `openclaw_gateway`, `pi_local`, `process`, and `http`. It has no built-in Hermes adapter.
+- The v0.3.1 route tree has neither `/api/cli-auth/challenges` nor global `/api/adapters` / `/api/plugins` registry endpoints. Its company-scoped adapter route returns models for a given type, not the installed registry. Source: https://github.com/paperclipai/paperclip/tree/v0.3.1/server/src/routes
+- Unauthenticated GETs to the live `/api/adapters` and `/api/plugins` returned 403; this alone does not prove route support.
+- The available Paperclip MCP has no safe adapter/plugin inventory call. Do not use `list_agents` for inventory: its response included sensitive adapter configuration in a prior tool trace. Exact deployed assignments remain unverified.
+- A native inventory/API bridge requires a compatible Paperclip upgrade or an authenticated, supported server-side route. The current PR #1 is blocked, draft only, and must not be merged or installed against v0.3.1.
+- Security follow-up: live 0.3.1 is in the affected range of https://github.com/paperclipai/paperclip/security/advisories/GHSA-3pw3-v88x-xj24 unless a backport is present; patched upstream version is 2026.416.0. Have the operator verify/upgrade.
