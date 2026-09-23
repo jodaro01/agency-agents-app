@@ -18,6 +18,11 @@ import type {
   DeviceFlowPoll,
   DeviceFlowStart,
   GithubStatus,
+  PaperclipAgentSummary,
+  PaperclipAuthPoll,
+  PaperclipLoginStart,
+  PaperclipProjectSummary,
+  PaperclipStatus,
   RepoStats,
   Settings,
   UpdateCheckOutcome,
@@ -172,6 +177,38 @@ export function githubCreateIssue(
     body,
     labels,
   });
+}
+
+// ============================================================
+// Paperclip native connection
+// ============================================================
+
+export function paperclipStatus(): Promise<PaperclipStatus> {
+  return invoke<PaperclipStatus>("paperclip_status");
+}
+
+export function paperclipLoginStart(apiBaseUrl: string, companyId: string): Promise<PaperclipLoginStart> {
+  return invoke<PaperclipLoginStart>("paperclip_login_start", { apiBaseUrl, companyId });
+}
+
+export function paperclipLoginPoll(): Promise<PaperclipAuthPoll> {
+  return invoke<PaperclipAuthPoll>("paperclip_login_poll");
+}
+
+export function paperclipLoginCancel(): Promise<void> {
+  return invoke<void>("paperclip_login_cancel");
+}
+
+export function paperclipAgentsList(): Promise<PaperclipAgentSummary[]> {
+  return invoke<PaperclipAgentSummary[]>("paperclip_agents_list");
+}
+
+export function paperclipProjectsList(): Promise<PaperclipProjectSummary[]> {
+  return invoke<PaperclipProjectSummary[]>("paperclip_projects_list");
+}
+
+export function paperclipDisconnect(): Promise<void> {
+  return invoke<void>("paperclip_disconnect");
 }
 
 // ============================================================
